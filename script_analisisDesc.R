@@ -1,10 +1,12 @@
-# Información de SNIIM - Tortilla - por días del año 2020
-## http://www.economia-sniim.gob.mx/TortillaAnualPorDia.asp?Cons=D&prod=T&Anio=2020&preEdo=Cd&Formato=Xls&submit=Ver+Resultados
+# Información de SNIIM - Tortilla - por días del año 2020/
+## http://www.economia-sniim.gob.mx/TortillaAnualPorDia.asp
+## Query: http://www.economia-sniim.gob.mx/TortillaAnualPorDia.asp?Cons=D&prod=T&Anio=2020&preEdo=Cd&Formato=Xls&submit=Ver+Resultados
 ## Revisar preprocesamiento de archivo raw respecto a BD:
-### Dos archivos: Uno por tortillerías y otro por autoservicios
-### Agregar columna 3: Establecimiento
-### Quitar renglón PPP
-### Replicar nombres de estados
+### [X] Dos archivos: Uno por tortillerías y otro por autoservicios
+### [X] Agregar columna 3:  (Autorservicio o tortillería)
+### [X] Quitar renglón PPP
+### [X] Replicar nombres de estados
+### [X] Mantener formato de fechas
 
 # Cargar paquetes
 library(dplyr)
@@ -13,11 +15,13 @@ library(tidyr)
 library(lubridate)
 
 # Leer archivos
-precios_por_ciudad_tortillerias <- read.csv("raw/precios_2020_ciudad_tortillerias_20ago.csv")
-precios_por_ciudad_autoservicios <- read.csv("raw/precios_2020_ciudad_autoservicios_20ago.csv")
+precios_por_ciudad_tortillerias <- read.csv("raw/2021/precios_2021_ciudad_tortillerias_19sep.csv")
+precios_por_ciudad_autoservicios <- read.csv("raw/2021/precios_2021_ciudad_autoservicios_19sep.csv")
+anio <- "2021"
+head(precios_por_ciudad_tortillerias)
+head(precios_por_ciudad_autoservicios)
 
 # Cambiar a formato largo
-head(precios_por_ciudad_tortillerias)
 precios_por_ciudad_tortillerias_l <- precios_por_ciudad_tortillerias %>% pivot_longer(cols = starts_with("x"),
                                      names_prefix = "X",
                                      names_to = "Fecha",
@@ -29,20 +33,21 @@ precios_por_ciudad_autoservicios_l <- precios_por_ciudad_autoservicios %>% pivot
                                                                            values_to = "Precio",
                                                                            values_drop_na = FALSE)
 # Juntar archivos
-# View(precios_por_ciudad_tortillerias_l)
-# View(precios_por_ciudad_autoservicios_l)
+View(precios_por_ciudad_tortillerias_l)
+View(precios_por_ciudad_autoservicios_l)
 precios_por_ciudad <- rbind(precios_por_ciudad_tortillerias_l,precios_por_ciudad_autoservicios_l)
-head(precios_por_ciudad)
+View(precios_por_ciudad)
 
 # Quitar valores fuera de rango
 max(precios_por_ciudad$Precio,na.rm = T)
 min(precios_por_ciudad$Precio,na.rm = T)
-precios_por_ciudad<-precios_por_ciudad %>% filter(Precio < 40)
+precios_por_ciudad<-precios_por_ciudad %>% filter(Precio < 30)
 
 # COnvertir a fechas en formato POSIX
 precios_por_ciudad <- 
   precios_por_ciudad %>% mutate(dia = substring(Fecha,1,2), mes = substring(Fecha,4,6))
 mes <- precios_por_ciudad$mes
+unique(mes)
 mes_num <- case_when(mes == "ene" ~ "01",
           mes == "feb" ~ "02",
           mes == "mar" ~ "03",
@@ -50,15 +55,20 @@ mes_num <- case_when(mes == "ene" ~ "01",
           mes == "may" ~ "05",
           mes == "jun" ~ "06",
           mes == "jul" ~ "07",
-          mes == "ago" ~ "08")
+          mes == "ago" ~ "08",
+          mes == "sep" ~ "09",
+          mes == "oct" ~ "10",
+          mes == "nov" ~ "11",
+          mes == "dic" ~ "12",)
 precios_por_ciudad <- 
-  precios_por_ciudad %>% mutate(mes = mes_num, Fecha = dmy(paste(dia,mes,"2020",sep="/")))
+  precios_por_ciudad %>% mutate(mes = mes_num, Fecha = dmy(paste(dia,mes,anio,sep="/")))
+View(precios_por_ciudad)
 
 # Generar estadísticas relevantes
-## Precio promedio por estado/establecimiento 2020
+## Precio promedio por estado/establecimiento
 precios_por_ciudad %>% group_by(Establecimiento,Estado) %>% 
   summarise(Precio_prom = mean(Precio, na.rm = T)) %>% 
-  pivot_wider(names_from = Establecimiento, values_from = Precio_prom)
+  pivot_wider(names_from = Establecimiento, values_from = Precio_prom) %>% View()
 
 ## Precio promedio por día
 precios_por_ciudad %>% group_by(Establecimiento, Fecha) %>% 
@@ -78,7 +88,7 @@ precios_por_ciudad %>% group_by(Establecimiento, mes) %>%
 # Generar visualizaciones a nivel nacional
 ggplot(precios_por_ciudad, aes(x = Precio,  fill = Establecimiento)) + 
   geom_histogram(binwidth = 0.5,  alpha = 0.5, position = "identity") +
-  scale_x_continuous(breaks = c(9:25), limits = c(9,25))+
+  scale_x_continuous(breaks = c(7:28), limits = c(9,30))+
   scale_fill_manual(values=c("#999999", "#E69F00"))+
   theme(legend.position="top", axis.title.y=element_blank())
 
@@ -107,14 +117,14 @@ plot <- precios_por_ciudad_resumen %>%
   ggplot(aes(x = Estado, y = Precio_promedio, color = Establecimiento))+
   geom_point(size=1.2, fill="white", position = pd)+
   geom_errorbar(aes(ymin=Precio_min, ymax=Precio_max), width=.4,position = pd)+
-  scale_y_continuous(breaks = c(9:23), limits = c(9,23))+
+  scale_y_continuous(breaks = c(9:26), limits = c(9,26))+
   scale_color_manual(values=c("#999999", "#E69F00")) +
   #geom_point(aes(y = Ult_precio,fill = Establecimiento), size = 1.2, shape = 8)+
   coord_flip()+
   theme_bw() +
   labs(title = "¿A cuánto el kilo de tortilla?",
        x = "Estado", y = "Precio |Min - Promedio - Max|",
-       subtitle = "Datos de enero a agosto 2020. Precio promedio y rango de precios por Estado",
+       subtitle = "Datos de enero a septiembre 2021. Precio promedio y rango de precios por Estado",
        caption = "Con información del SNIIM (Sistema Nacional de Información e Integración de Mercados), SE. \n 
        Orden: descendente, mayor diferencia de precios entre establecimientos")+ 
   theme(legend.justification=c(1,0),
@@ -123,7 +133,7 @@ plot <- precios_por_ciudad_resumen %>%
 
 plot
 
-png("gráficos/Precio_Prom_Edo_2020.png", width = 3200, height = 1900, units = "px",res = 300)
+png("gráficos/Precio_Prom_Edo_2021.png", width = 3200, height = 1900, units = "px",res = 300)
 plot
 dev.off()
 
